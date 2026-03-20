@@ -1,6 +1,6 @@
 /******* BLUETOOTH INTERFACE **********
 REQUIRES
-  btlib.c/h  Version 24 
+  btlib.c/h  Version 25 
   devices.txt
 COMPILE
   gcc btferret.c btlib.c -o btferret

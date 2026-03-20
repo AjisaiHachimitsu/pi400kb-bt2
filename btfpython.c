@@ -1,4 +1,4 @@
-//############ VERSION 24 #################
+//############ VERSION 25 #################
 
 #include <Python.h>
 
@@ -155,7 +155,7 @@ static struct PyModuleDef btfpy = {PyModuleDef_HEAD_INIT,"btfpy","",-1,BtfpyMeth
 PyMODINIT_FUNC PyInit_btfpy()
   {
   PyObject* module;
-  
+ 
   module = PyModule_Create(&btfpy); 
 
 
@@ -213,6 +213,7 @@ PyMODINIT_FUNC PyInit_btfpy()
   PyModule_AddIntConstant(module,"CLASSIC_DATA",CLASSIC_DATA);
   PyModule_AddIntConstant(module,"LE_NOTIFY_ENABLE",LE_NOTIFY_ENABLE);
   PyModule_AddIntConstant(module,"LE_NOTIFY_DISABLE",LE_NOTIFY_DISABLE);
+  PyModule_AddIntConstant(module,"CLASSIC_CONNECT",CLASSIC_CONNECT);
 
   PyModule_AddIntConstant(module,"KEY_OFF",KEY_OFF);
   PyModule_AddIntConstant(module,"PASSKEY_OFF",PASSKEY_OFF);
@@ -244,6 +245,9 @@ PyMODINIT_FUNC PyInit_btfpy()
   PyModule_AddIntConstant(module,"ENABLE_OBEX",ENABLE_OBEX);
   PyModule_AddIntConstant(module,"HID_MULTI",HID_MULTI);
   PyModule_AddIntConstant(module,"FAST_TIMER",FAST_TIMER);
+  
+  PyModule_AddIntConstant(module,"DONGLE_COM_PROMPT",DONGLE_COM_PROMPT);
+  PyModule_AddIntConstant(module,"DONGLE_COM_AUTO",DONGLE_COM_AUTO); 
   
   return(module);
   }

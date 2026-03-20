@@ -1,50 +1,72 @@
 Pi Dongle for Windows
 ==========================
 
-*Version 24*
+*Version 25*
 
 ## Contents
 - [1 Introduction](#1-introduction)
-- [2 Setup](#2-setup)
-    - [2.1 File list](#2-1-file-list) 
-    - [2.2 Pi Pico Instructions](#2-2-pi-pico-instructions)
+    - [1.1 File list](#1-1-file-list)
+- [2 Dongles](#2-dongles)
+    - [2.1 Pico dongle](#2-1-pico-dongle)
+        - [2.1.1 Hardware](#2-1-1-hardware)      
+        - [2.1.2 Visual Studio Code Procedure](#2-1-2-visual-studio-code-procedure) 
+        - [2.1.3 Pi SDK Procedure](#2-1-3-pi-sdk-procedure)         
+        - [2.1.4 Compile problems](#2-1-4-compile-problems)             
+    - [2.2 Pi Zero dongle](#2-2-pi-zero-dongle)
         - [2.2.1 Hardware](#2-2-1-hardware)      
-        - [2.2.2 Visual Studio Code Procedure](#2-2-2-visual-studio-code-procedure) 
-        - [2.2.3 Pi SDK Procedure](#2-2-2-pi-sdk-procedure)         
-        - [2.2.4 Compile problems](#2-2-3-compile-problems)             
-    - [2.3 Pi Zero Instructions](#2-3-pi-zero-instructions)
-        - [2.3.1 Hardware](#2-3-1-hardware)      
-        - [2.3.2 Connections](#2-3-2-connections)
-        - [2.3.3 Procedure](#2-3-3-procedure)
-    - [2.4 Windows Instructions](#2-4-windows-instructions)
-        - [2.4.1 File list](#2-4-1-file-list)
-        - [2.4.2 Procedure](#2-4-2-procedure)
-        - [2.4.3 Manual procedure](#2-4-3-manual-procedure)        
-- [3 Windows Code](#3-windows-code)
-    - [3.1 Where to put your code](#3-1-where-to-put-your-code)    
-    - [3.2 Screen prints](#3-2-screen-prints)
-    - [3.3 Input functions](#3-3-input-functions)
+        - [2.2.2 Connections](#2-2-2-connections)
+        - [2.2.3 Procedure](#2-2-3-procedure)
+- [3 Your code](#3-your-code)
+    - [3.1 Command line C programs](#3-1-command-line-c-programs)
+    - [3.2 Command line Python programs](#3-2-command-line-python-programs)
+    - [3.3 Windows GUI program](#3-3-windows-gui-program)
+        - [3.3.1 File list](#3-3-1-file-list)
+        - [3.3.2 Procedure](#3-3-2-procedure)
+        - [3.3.3 Manual procedure](#3-3-3-manual-procedure)        
+        - [3.3.4 Where to put your code](#3-3-4-where-to-put-your-code)    
+        - [3.3.5 Screen prints](#3-3-5-screen-prints)
+        - [3.3.6 Input functions](#3-3-6-input-functions)
           
 
 ## 1 Introduction
 
-The btlib library, btferret and any C code written for Linux can be run from a Windows PC by using a
+The btlib library, btferret and any Python or C code written for Linux can be run from a Windows PC by using a
 Raspberry Pi Pico 2W or Zero 2W as a Bluetooth dongle for the PC. (The Pico is easier to set up and
-makes more sense as a dongle). The PC then has direct access to Bluetooth at the HCI level.
+makes more sense as a dongle). The PC then has direct access to Bluetooth at the HCI level, which is
+not possible with the on-board Bluetooth. It might seem crazy that a dongle is necessary, but
+Windows needs a kernel-mode driver to get at the on-board Bluetooth, and that is vastly more
+complcated than a dongle.
 
-There are instructions for setting up the dongle, and also a Windows program (shown below)
-that is compiled on a PC with Visual Studio, and which communicates with the dongle. 
-The Windows code includes the Linux btferret.c and has empty functions (in mycode.c) into
+There are instructions for setting up a Pico dongle in [section 2.1](#2-1-pico-dongle). Python or C btferret code can
+then be run from the command line in the same way as with Linux. The C code compile instructions are in
+[section 3.1](#3-1-command-line-c-programs), and the Python module compile instructions are in
+[section 3.2](#3-2-command-line-python-programs).
+There is also a Windows GUI program (shown below)
+that is compiled with Visual Studio (instructions in [section 3.3](#3-3-windows-gui-program)).
+It includes the Linux btferret.c and has empty functions (in mycode.c) into
 which you can insert your own code. Linux code can be simply pasted into
-mycode.c, with minor changes for input and output described in section 3,
+mycode.c, with minor changes for input and output described in section 3.3,
 and no knowledge of Windows programming is needed. Linux inputs can be replaced with simple
 functions that pop up a dialog window.
 
+To confirm, there are three ways to run btferret code under Windows:
+
+1. C code from the command line
+2. Python code from the command line
+3. C code inside a Windows GUI program
+
+
+
+A Pico dongle.
+
+![picture](dongle.png)
+
+Windows GUI screen.
+
 ![picture](wind0.png)
 
-## 2 Setup
 
-## 2-1 File list
+## 1-1 File list
 
 
 ```
@@ -58,7 +80,21 @@ For the Pi Pico dongle
 For the PiZero dongle
   btfdongle.c
 
-For Windows
+For Command line C programs
+  btlibw.c
+  btlib.h
+  btfcmdline.c
+  devices.txt
+          
+For Command line Python programs
+  btlibw.c
+  btlib.h
+  btfcmdline.c
+  btfpython.c
+  btfwinpymake.py
+  devices.txt
+        
+For Windows GUI program
   BTferret.sin
   BTferret.vcxproj
   BTferret.vcxproj.filters
@@ -75,13 +111,16 @@ NOTE in case you modify btferret/btlib for Linux and Windows
   btferretw.c is the Linux btferret.c with #define BTFWINDOWS uncommented
 ```
 
-## 2-2 Pi Pico Instructions
+## 2 Dongles
+
+
+## 2-1 Pico dongle
 
 These instructions are for a Pico 2W, but a Pico W will also work. The code can be
 compiled with Visual Studio Code, or the Pi SDK. The btlib functions
 running on the Windows PC replace the Pico's btstack.
 
-### 2-2-1 Hardware
+### 2-1-1 Hardware
 
 The follwing items are needed:
 
@@ -90,7 +129,7 @@ The follwing items are needed:
 2. Micro USB to Male USB A cable or adapter
 ```
 
-### 2-2-2 Visual Studio Code Procedure
+### 2-1-2 Visual Studio Code Procedure
 
 This procedure uses Visual Studio Code on a PC to compile and download code to the Pico 2W. Here are full
 instructions if using VSC for the first time. There may be long delays at various stages as stuff is
@@ -133,7 +172,7 @@ downloaded.
 16. Run the BTferret Windows program to connect and control the dongle.
 ``` 
 
-### 2-2-3 Pi SDK Procedure
+### 2-1-3 Pi SDK Procedure
 
 This procedure uses the Pico SDK on a Pi. It includes instructions to install the SDK from scratch.
 If the SDK is already installed, start at step 8.
@@ -193,7 +232,7 @@ or
 20. Plug the Pico into a PC and run the BTferret Windows code.
 ```
 
-### 2-2-4 Compile problems
+### 2-1-4 Compile problems
 
 If the board type is not correct, compile can fail with missing include files.
 
@@ -225,12 +264,12 @@ then modifications can be made to include btstack as follows:
 Now btstack is linked but not initialized. So it isn't used, but the compiler can see it,
 
 
-## 2-3 Pi Zero Instructions
+## 2-2 Pi Zero dongle
 
 These instructions also work for a Pi4, but you must be sure that the PC can supply enough
 current via its USB port.
 
-### 2-3-1 Hardware
+### 2-2-1 Hardware
 
 The follwing items are needed:
 
@@ -243,7 +282,7 @@ The follwing items are needed:
 6. Power supply with Micro USB plug
 ```
 
-### 2-3-2 Connections
+### 2-2-2 Connections
 
 
 A Pi Zero needs one set of connections to set up the dongle, and then a different arrangement for
@@ -253,7 +292,7 @@ and power down on a first press, and reboot on a second.
 ![picture](wind1.png)
 
 
-### 2-3-3 Procedure
+### 2-2-3 Procedure
 
 This procedure uses a PC to download the Pi operating system and btfdongle.c to
 an SD card for the PiZero2W, and then modify the PiZero2W configuration to operate as a Bluetooth dongle.
@@ -419,10 +458,117 @@ and report "COM open/Bluetooth OK". It is now waiting for commands from BTferret
 running on the PC. Check on the PC via: right click Start/Device manager/Ports (COM & LPT) which should list
 the dongle as a USB Serial Device (COM port). Note the COM number, but it may change every time the PC is started.
 
- 
-## 2-3 Windows Instructions
 
-### 2-3-1 File list
+
+## 3 Your code 
+
+## 3-1 Command line C programs
+
+The Microsoft C/C++ SDK must be installed, preferably with Visual Studio.
+
+```
+DOWNLOAD from the github windows folder 
+  btlibw.c
+  btlib.h
+  btfcmdline.c
+  devices.txt
+```
+
+```
+In the Windows search box type:
+  developer command prompt
+  
+Click on the result to pop up a command prompt window with the
+correct environment for C compilation.
+
+COMPILE your program from the command line:
+
+cl /D_CRT_SECURE_NO_WARNINGS  yourcode.c btfcmdline.c btlibw.c
+
+Then run yourcode
+
+The Linux btferret.c can be compiled as follows
+
+cl /D_CRT_SECURE_NO_WARNINGS  btferret.c btfcmdline.c btlibw.c
+```
+
+The only change to Linux C programs is to specify the dongle's COM port number
+in the Bluetooth initialisation. It can be done in three ways: prompt, auto search,
+or specify the number.
+
+```
+init_blue("C:\\rat\\devices.txt");      // Will prompt for COM port number
+   or use the _ex version
+init_blue_ex("C:\\rat\\devices.txt",7)  // Dongle is on COM7
+init_blue_ex("C:\\rat\\devices.txt",DONGLE_COM_PROMPT);  // Prompt for COM port
+init_blue_ex("C:\\rat\\devices.txt",DONGLE_COM_AUTO);    // Searches for COM port
+```
+
+The DONGLE\_COM\_AUTO search option tries to open all COM ports from COM1 to COM20.
+It then sends ping data, and if it receives the correct response, it uses that port.
+So beware if there are lower-numbered COM ports that would be affected by this.
+If you want to re-write the search procedure, it is in the inithci() function near
+the top of btfcmdline.c.
+
+
+## 3-2 Command line Python programs
+
+The Microsoft C/C++ SDK must be installed, preferably with Visual Studio.
+
+```
+DOWNLOAD from the github windows folder 
+  btlibw.c
+  btlib.h
+  btfcmdline.c
+  btfpython.c
+  btfwinpymake.py
+  devices.txt
+```
+
+The Python btfpy library module must be built first.
+
+```
+RUN from the command line
+(NOTE do not use the developer command prompt that was needed for C)
+
+python btfwinpymake.py build
+
+This should compile the module. It will create a subdirectory called build
+containing a subdirectory called somthing like lib.win-amd64-cpython-312.
+This will contain the module called something like btfpy.cp312-win-amd64.pyd.
+Copy this to your code directory and rename it btfpy.pyd so the import btfpy
+instruction can find it.
+
+build
+  lib.win-amd-cpython-312
+    btfpy.cp312-win-amd64.pyd   RENAME this btfpy.pyd and copy
+                                to where your code can find it
+
+Then run any Linux Python code, for example:
+
+python btferret.py
+```
+
+The only change to Linux Python programs is to specify the dongle's COM port number
+in the Bluetooth initialisation. It can be done in three ways. It can be done
+in three ways: prompt, auto search, or specify the number.
+
+```
+btfpy.Init_blue("C:\\rat\\devices.txt");      // Will prompt for COM port number
+   or use the _ex version
+btfpy.Init_blue_ex("C:\\rat\\devices.txt",7)  // Dongle is on COM7
+btfpy.Init_blue_ex("C:\\rat\\devices.txt",btfpy.DONGLE_COM_PROMPT);  // Prompt for COM port
+btfpy.Init_blue_ex("C:\\rat\\devices.txt",btfpy.DONGLE_COM_AUTO);    // Searches for COM port
+```
+The DONGLE\_COM\_AUTO search option tries to open all COM ports from COM1 to COM20.
+It then sends ping data, and if it receives the correct response, it uses that port.
+So beware if there are lower-numbered COM ports that would be affected by this.
+If you want to re-write the search procedure, it is in the inithci() function near
+the top of btfcmdline.c.
+
+## 3-3 Windows GUI program
+
+### 3-3-1 File list
 
 DOWNLOAD from the github windows folder - see Procedure section for destination locations.
 
@@ -444,7 +590,7 @@ NOTE - if you intend to modify the Linux btferret.c or btlib.c
   btlibw.c  is the Linux btlib.c with #define BTFWINDOWS uncommented  
 ```
 
-### 2-3-2 Procedure
+### 3-3-2 Procedure
 
 These are instructions for compiling the Windows program BTferret using Visual Studio.
 
@@ -500,7 +646,7 @@ C:\.....\BTferret\Release\BTferret.exe
 ```
 
 
-### 2-3-3 Manual Procedure
+### 3-3-3 Manual Procedure
 
 The instructions above should work by reading the project settings from the BTferret.sin/vcxpoj files.
 If not, this more difficult procedure builds the project and settings from scratch.
@@ -599,16 +745,13 @@ Location
 
 C:\Users\xxxx\source\repos\BTferret\Release\BTferret.exe
 ```
-
-    
      
-## 3 Windows code
+
+### 3-3-4 Where to put your code
 
 Code written for Linux can be simply pasted into mycode.c with some minor changes for input and
 output functions. No Windows programming knowledge is needed. Simple Windows screen print
 and input functions are available from the btlib library as described below.
-
-### 3-1 Where to put your code
 
 Your code goes into mycode.c. There are ten functions that are called from the Run menu: mycode1(),
 mycode2(),.... mycode10(). Mycode1 is programmed to demonstrate the Windows input/output
@@ -629,7 +772,7 @@ int mycode2()
 ```
          
 
-### 3-2 Screen prints
+### 3-3-5 Screen prints
 
 The C printf function will not work with Windows. The btlib library provides a print function. 
 Use it as follows:
@@ -641,7 +784,7 @@ LINUX
   printf("Result = %d\n",retval);
   
   
-WINDOWS
+WINDOWS GUI
 
   char buf[32];
   
@@ -663,7 +806,7 @@ void print(char *s)
 If you want to save the screen output to a file, use Edit/Save As which does the same thing as
 the btlib output_file() function.
 
-### 3-3 Input functions
+### 3-3-6 Input functions
 
 The following functions are available from the btlib library. The Mycode1 function in mycode.c demonstates
 all these functions. Documentation in the main btferret README.

@@ -308,3 +308,16 @@ and on a stand-alone Pico.
    for your own application that uses an Xbox controller as an input device. There is also a Pico
    version in the picostack folder. See section 2.3.11 in the documentation.
    
+### Version 25
+
+1. Python and C code can now be run from the Windows command line in the same way as with Linux.
+   See the windows subdirectory README sections 3.1 and 3.2. So the same code can run via the command line
+   under Linux and Windows (with a Pico dongle). This is in addition to the existing mechanism of
+   incorporating C code in the Windows GUI program.
+   
+2. New callback operation for a universal server, CLASSIC_CONNECT, called when a classic device connects.
+
+3. The rssi (signal strength) of remote LE devices is now available in the LE advert data.
+
+4. Bug fix. The universal server could not be stopped by an x key press.
+   

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "btlib.h"
 
-// Version 24
+// Version 25
 
   // include for LED on/off
 #include "pico/cyw43_arch.h"
@@ -38,7 +38,7 @@ void mycode()
   {
   if(init_blue(devices) == 0)
     return;
-    
+ 
   while(1)
     {
     le_server(lecallback,10);  // 10 = 1 second timer 

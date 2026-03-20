@@ -1,7 +1,7 @@
 Python and C Bluetooth Library
 ==============================
 
-*Version 24*
+*Version 25*
 
 ## Contents
 - [1 Introduction](#1-introduction)
@@ -168,8 +168,9 @@ This is a C and Python Bluetooth interface that has been developed for Raspberry
 testing on Ubuntu, and should work on other Linux systems).
 
 It will also run on Windows if a Raspberry Pi Pico 2W or Zero 2W is used as a Bluetooth dongle on a PC.
-C code described here and written for Linux can be pasted into a Windows source file and no
-knowledge of Windows programming is needed. Instructions for this are in the
+Python and C code described here and written for Linux can be run from the Windows command line, or
+pasted into a Windows GUI source file (with no
+knowledge of Windows programming needed). Instructions for this are in the
 [Windows README](windows/README.md) file in the windows folder.
 
 It will also run on a Pico as a replacement for btstack, with your code written in C. Instructions in the
@@ -323,12 +324,30 @@ sudo ./mycode
 
 C code can be run from Windows by setting up a Pico 2W or Pi Zero 2W as a Bluetooth dongle for a PC.
 (The code cannot access the on-board Windows machine Bluetooth).
-There is source code for a Windows program that interfaces with the dongle.
-It includes the btferret.c code, and empty "mycode" functions where you can put your own programs.
-Instructions for setting up the dongle, and for compiling the Windows program using Visual Studio
-are in the [Windows README](windows/README.md) file in the windows folder. No knowledge of Windows
-programming is needed. The code described in this document will run from the Windows program.
-This is sample starting code to go in the Windows mycode.c. Note that double backslash is needed for
+
+In the [Windows README](windows/README.md) file in the windows subdirectoy
+there are instructions for setting up a Pico or Zero dongle. Python or C btferret code can
+then be run from the command line in the same way as with Linux.
+There is also a Windows GUI program that is compiled with Visual Studio.
+It includes the Linux btferret.c and has empty functions (in mycode.c) into
+which you can insert your own code. Linux C code can be simply pasted into
+mycode.c, with minor changes for input and output
+(with no knowledge of Windows programming needed). Linux inputs can be replaced with simple
+functions that pop up a dialog window.
+
+This is starting code for a command line program that needs to know the dongle's COM port,
+but see the init\_blue\_ex documentation for prompt and auto search options.
+
+```
+int main()
+  {
+  if(init_blue_ex("C:\\rat\\devices.txt",7)   // Dongle is on COM7
+    return(0);
+  ...    
+  }
+```
+
+This is starting code to go in the Windows GUI mycode.c. Note that double backslash is needed for
 Windows file names.
 
 ```
@@ -336,16 +355,13 @@ int mycode2()
   {
   if(init_blue("C:\\Users\\xxxx\\Documents\\devices.txt") == 0)
     return(0);
-
-  // your code here
-
-  close_all();
+  ....
   }
 ```
 
 
-The following are Windows-only
-input/output functions that can be used to replace Linux functions that do not work with Windows.
+The following are Windows-GUI-only
+input/output functions that can be used to replace Linux functions that do not work with Windows GUI.
 
 ```
 print
@@ -4136,7 +4152,7 @@ These library functions are in btlib.c/btlib.h.
 [time\_ms](#4-2-62-time\_ms) - Returns time in ms since program start<br/>
 PYTHON ONLY<br/>
 [Print\_data](#4-2-42-print\_data) - Print data object as a hex dump<br/>
-WINDOWS ONLY<br/>
+WINDOWS GUI ONLY<br/>
 [input\_filename](#4-2-19-input\_filename) - Dialog window to input a file name<br/>
 [input\_integer](#4-2-20-input\_integer) - Dialog window to input an integer<br/>
 [input\_radio](#4-2-21-input\_radio) - Dialog window to select from radio buttons<br/>
@@ -4177,7 +4193,7 @@ find_ctic_index(node,flag,uuid[])
     flag =  UUID_2, UUID_16
 hid_key_code(key)
 init_blue("filename")
-WINDOWS ONLY
+WINDOWS GUI ONLY
   input_filename(prompt[],name[],namelen,rwflag,default[])
   input_integer(prompt,&default)
   input_radio(prompt,list[])
@@ -4215,7 +4231,7 @@ notify_ctic(node,cticn,notifyflag,notify_callback)
     notifyflag = NOTIFY_ENABLE, NOTIFY_DISABLE
     notify_callback(lenode,cticn,data[],datlen)
 output_file("filename")
-print("Hello\n")   WINDOWS ONLY
+print("Hello\n")   WINDOWS GUI ONLY
 read_ctic(node,cticn,inbuf[],bufsize)
 read_error()
     return = 0,ERROR_TIMEOUT,ERROR_KEY,ERROR_FATAL,ERROR_DISCONNECT
@@ -4251,8 +4267,9 @@ universal_server(universal_callback,endchar,keyflag,timerds)
               PASSKEY_OFF, PASSKEY_LOCAL, PASSKEY_REMOTE
     endchar = termination character OR PACKET_ENDCHAR
     universal_callback(node,operation,cticn,data[],datlen)
-    operation = CLASSIC_DATA, SERVER_TIMER, LE_CONNECT, LE_READ, LE_WRITE,
-          LE_KEYPRESS, LE_NOTIFY_ENABLE, LE_NOTIFY_DISABLE, LE_DISCONNECT
+    operation = CLASSIC_DATA, CLASSIC_CONNECT, SERVER_TIMER
+                LE_CONNECT, LE_READ, LE_WRITE, LE_KEYPRESS,
+                LE_NOTIFY_ENABLE, LE_NOTIFY_DISABLE, LE_DISCONNECT
 user_function(n0,n1,n2,n3,dat0[],dat1[])
 uuid_advert(uuid[])
 wait_for_disconnect(node,timeoutms)
@@ -4372,6 +4389,9 @@ number_found = Find_ctics(node)
                 PASSKEY_OFF, PASSKEY_LOCAL, PASSKEY_REMOTE
                 endchar = termination character OR PACKET_ENDCHAR
                 universal_callback(node,operation,cticn,data[],datlen)
+                operation = CLASSIC_DATA, CLASSIC_CONNECT, SERVER_TIMER
+                     LE_CONNECT, LE_READ, LE_WRITE, LE_KEYPRESS,
+                     LE_NOTIFY_ENABLE, LE_NOTIFY_DISABLE, LE_DISCONNECT                
         int = User_function(n0,n1,n2,n3,data0,data1)
        None = Uuid_advert(uuid[])
      okfail = Wait_for_disconnect(node,timeoutms)
@@ -4903,7 +4923,7 @@ device_info(BTYPE_CL | BTYPE_CONNECTED);
 device_info(BTYPE_LE | BTYPE_DISCONNECTED | BTYPE_SHORT);
                     // short list disconnected LE servers
 
-WINDOWS CODE
+WINDOWS GUI CODE
 
 char buf[256];
 device_info_ex(BTYPE_LE | BTYPE_CONNECTED | BTYPE_SHORT,buf,256);
@@ -5384,6 +5404,11 @@ via [classic\_scan](#4-2-1-classic\_scan)
 or [le\_scan](#4-2-29-le\_scan).
 Characteristics are found via [find\_ctics](#4-2-15-find\_ctics).
 
+Windows command line programs need to know the Pico dongle COM port. The
+init\_blue\_ex instruction should be used to specify the COM port number, or one
+of the two other options to prompt or search. But WARNING - the search option opens
+and sends data to COM ports from COM1 to COM20 until it finds a btferret dongle.
+
 
 PARAMETERS
 
@@ -5392,6 +5417,11 @@ filename = text file containing pre-set device information
 device = hci device number
          init_blue() assumes device=0 (hci0)
          use init_blue_ex() to specify some other hci number (e.g. 2 for hci2)
+         
+FOR WINDOWS COMMAND LINE PROGRAMS ONLY
+device = Dongle COM port number
+          or DONGLE_COM_PROMPT     prompts for COM port
+          or DONGLE_COM_AUTO       searches for COM port from COM1 to COM20
 ```
 
 RETURN
@@ -5409,16 +5439,32 @@ if(init_blue("devices.txt") == 0)
 
 if(init_blue("/home/pi/mydevices.txt") == 0)
   return(0);
+  
+if(init_blue_ex("devices.txt",1) == 0)  // use hci1
+  return(0);
+
+FOR WINDOWS COMMAND LINE PROGRAMS ONLY
+
+init_blue_ex("C:\\rat\\devices.txt",7);   // Dongle is on COM7
+init_blue_ex("C:\\rat\\devices.txt",DONGLE_COM_PROMPT);  // Will prompt for dongle COM port number
+init_blue_ex("C:\\rat\\devices.txt",DONGLE_COM_AUTO);    // Searches for dongle COM port number
 
 PYTHON
 if btfpy.Init_blue("devices.txt") == 0:
   exit(0)  # terminate program
+  
+FOR WINDOWS COMMAND LINE PROGRAMS ONLY
+
+btfpy.Init_blue_ex("C:\\rat\\devices.txt",7);   // Dongle is on COM7
+btfpy.Init_blue_ex("C:\\rat\\devices.txt",btfpy.DONGLE_COM_PROMPT);
+btfpy.Init_blue_ex("C:\\rat\\devices.txt",btfpy.DONGLE_COM_AUTO);
+ 
 ```
 
 ## 4-2-19 input\_filename
 
 ```c
-WINDOWS ONLY
+WINDOWS GUI ONLY
 int input_filename(char *prompt,char *buf,int buflen,int rwflag,char *default)
 ```
 
@@ -5462,7 +5508,7 @@ input_filename("Input file name",buf,256,0,"C:\rat\default.txt");
 ## 4-2-20 input\_integer
 
 ```c
-WINDOWS ONLY
+WINDOWS GUI ONLY
 int input_integer(char *prompt,int *default)
 ```
 
@@ -5492,7 +5538,7 @@ ret = input_integer("Input integer",&default);
 ## 4-2-21 input\_radio
 
 ```c
-WINDOWS ONLY
+WINDOWS GUI ONLY
 int input_radio(char *prompt,char *list)
 ```
 
@@ -5539,7 +5585,7 @@ ret = input_radio("Select option","1 - One\n3 - Three\n20 - Twenty");
 ## 4-2-22 input\_select
 
 ```c
-WINDOWS ONLY
+WINDOWS GUI ONLY
 int input_select(char *prompt,char *list)
 ```
 
@@ -5597,7 +5643,7 @@ ret = input_select("Click yes or no","0 - No\n1 - Yes");
 ## 4-2-23 input\_string
 
 ```c
-WINDOWS ONLY
+WINDOWS GUI ONLY
 int input_string(char *prompt,char *buf,int buflen,char *default)
 ```
 
@@ -5715,7 +5761,8 @@ btfpy.Le_advert(node)
 ```
 
 Returns the raw advert data of an LE device. A scan via le\_scan() must be called first. The first byte is the
-number of bytes that follow. For example, an iBeacon returns data like this:
+number of bytes that follow. The last byte is the rssi (signal strength).
+For example, an iBeacon returns data like this:
 
 ```
 1A FF 4C 00 02 15 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF 00 12 34 56 78 99
@@ -5749,7 +5796,7 @@ node numbers are then searched for LE devices with available advert data which i
 device\_type() function returns 0 when there are no more known devices.
 
 ```
-int n,dn;
+int n,dn,rssi;
 unsigned char *adv;
 
 le_scan();
@@ -5761,6 +5808,12 @@ for(dn = 1000 ; device_type(dn) != 0 ; ++dn)
     for(n = 0 ; n <= adv[0] ; ++n)
       printf(" %02X",adv[n]);
     printf("\n");
+    rssi = adv[adv[0]];
+    if(rssi > 0x7F)
+      rssi = rssi - 256;
+    else
+      rssi = 0;
+    printf("RSSI = %d dBm\n",rssi);
     }
   }
 
@@ -6450,7 +6503,7 @@ list_channels(7,LIST_SHORT);  // list of node 7 RFCOMM serial channel names
 list_channels(5,LIST_FULL);   // full info about node 5 serial channels
 
 
-WINDOWS CODE
+WINDOWS GUI CODE
 char *buf[256];
 list_channels_ex(7,LIST_SHORT,buf,256);
 channel = input_select("Input channel",buf);
@@ -6509,7 +6562,7 @@ list_citcs(4,LIST_SHORT | CTIC_W);  // list writeable characteristic names of no
 list_ctics(3,LIST_FULL);   // full characteristic info of node 3
                            // known by device info
 
-WINDOWS CODE
+WINDOWS GUI CODE
 char buf[256];
 list_ctics_ex(4,LIST_SHORT | CTIC_R,buf,256);
 cticn = input_select("Input characteristic index",buf);
@@ -6917,7 +6970,7 @@ btfpy.Output_file("/home/pi/output.txt")
 ## 4-2-41 print
 
 ```c
-WINDOWS ONLY
+WINDOWS GUI ONLY
 void print(char *txt)
 ```
 
@@ -8342,6 +8395,10 @@ int universal_callback(int clientnode,int operation,int cticn,unsigned char *dat
     // clientnode and cticn are invalid
     // This is called by the server not a client
     }
+  else if(operation == CLASSIC_CONNECT)
+    {
+    // Classic clientnode has just connected
+    }
   else if(operation == CLASSIC_DATA)
     {
     // Classic clientnode has sent data, length datlen
@@ -8382,6 +8439,9 @@ def universal_callback(clientnode,operation,cticn,data,datlen):
     # clientnode and cticn are invalid
     # This is called by the server not a client
     pass
+  elif(operation == btfpy.CLASSIC_CONNECT):
+    # clientnode has just connected
+    pass    
   elif(operation == btfpy.CLASSIC_DATA):
     # clientnode has sent data, length datlen
     # return(SERVER_EXIT) to stop server

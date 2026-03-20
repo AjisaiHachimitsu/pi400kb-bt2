@@ -6,9 +6,7 @@
 #include <process.h>
 #include <time.h>
 
-// Version 24
-
-#define VERSION 24
+#define VERSION 25
 
 int init_blue(char *fname);  // btlibw.c
 int check_init(int flag);
@@ -64,7 +62,7 @@ void print_status(char *s);
 int sendpack(unsigned char* buf, int len);
 int readpack(unsigned char* buf, int toms);
 void printn(char* buf, int len);
-int inithci(void);
+int inithci(int devid);
 int closehci(void);
 void inputpin(char* prompt, char* sbuf);
 int setkeymode(int setflag);
@@ -2028,7 +2026,7 @@ int readpack(unsigned char* buf, int toms)
   return(len);
   }
 
-int inithci(void)
+int inithci(int devid)
   {
   return(1);
   }

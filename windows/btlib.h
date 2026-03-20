@@ -1,5 +1,5 @@
 #include <stdint.h>
-  // for btlib.c Version 24
+  // for btlib.c Version 25
   // devdata type values
 #define BTYPE_LO 1
 #define BTYPE_CL 2
@@ -16,7 +16,7 @@
    // flags for read
 #define EXIT_TIMEOUT  1
 #define EXIT_KEY      2 
-   
+ 
    // RFCOMM channel for connect_node()
 #define CHANNEL_NODE    0
 #define CHANNEL_STORED  1  
@@ -64,6 +64,7 @@
 #define CLASSIC_DATA 8
 #define LE_NOTIFY_ENABLE 9
 #define LE_NOTIFY_DISABLE 10
+#define CLASSIC_CONNECT 11
 
   // link key
 #define KEY_OFF 0
@@ -97,6 +98,8 @@
 #define READ_WAIT -1
 #define PACKET_ENDCHAR 254
 
+#define DONGLE_COM_PROMPT 0
+#define DONGLE_COM_AUTO -1
 
 void classic_scan(void);
 int classic_server(int clientnode,int(*callback)(int,unsigned char*,int),char endchar,int keyflag);

@@ -6,7 +6,14 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 
-// VERSION 24
+// VERSION 25
+
+// If flash memory use conflicts with your other code, move
+// the memory location as detailed in the documentation or
+// uncomment NOFLASH to stop use of flash memory to store link keys.
+// Reconnection of paired devices will no longer work
+// Do no use pairing/security, or make a new pairing on each connection
+// #define NOFLASH
 
     // KEYSECTORS
     // FLASH memory size in sectors used for key/pair storage
@@ -457,6 +464,10 @@ int readkeyfile(unsigned char **table,int *count)
   int n,k,flag,pagen,lastpagen,flen,retval,alloclen;
   unsigned char *p,len,lastlen,*atable;
 
+#ifdef NOFLASH
+    return(0);
+#endif
+
   *count = 0;
   *table = NULL;
 
@@ -516,6 +527,10 @@ void writekeyfile(unsigned char *table,int count)
   uint32_t ints;
   int n,k,flag,pagen,flen,datlen,writen,needpage;
   unsigned char *p,len,*atable;
+
+#ifdef NOFLASH
+  return;
+#endif
 
   if(table == NULL || count == 0)
     return;
@@ -580,6 +595,10 @@ void clear_pair_store()
   int n;
   uint32_t ints;
 
+#ifdef NOFLASH
+  return;
+#endif
+
   for(n = 0 ; n < 32 ; ++n)
     pagebuf[n] = btferrets[n];
   for(n = 32 ; n < FLASH_PAGE_SIZE ; ++n)
@@ -593,6 +612,10 @@ void clear_pair_store()
 
 void freekeytable(unsigned char **table)
   {
+#ifdef NOFLASH
+  return;
+#endif
+
   if(*table != NULL)
     free(*table-1);
   *table = NULL;
@@ -603,6 +626,10 @@ unsigned char *newkeytable(int count)
   int alloclen,n;
   unsigned char *table;
 
+#ifdef NOFLASH
+  return(NULL);
+#endif
+  
   alloclen = count*22 + 1;
   n = alloclen / FLASH_PAGE_SIZE;
   if((alloclen % FLASH_PAGE_SIZE) != 0)

@@ -1,4 +1,4 @@
-/********* Version 24.1 *********/
+/********* Version 25 *********/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,8 +39,7 @@
 
 /************** END BLUETOOTH DEFINES ********/
 
-
-#define VERSION 24
+#define VERSION 25
    // max possible NUMDEVS = 1024 
 #define NUMDEVS 1024
 #define NAMELEN 34
@@ -459,7 +458,7 @@ void freekeytable(unsigned char **table);
 int sendpack(unsigned char *buf,int len);
 int readpack(unsigned char *buf,int toms);
 void printn(char *buf,int len);
-int inithci(void);
+int inithci(int devid);
 int closehci(void);
 void inputpin(char *prompt,char *sbuf);
 void serverexit(int flag);
@@ -1462,7 +1461,7 @@ int init_blue_ex(char *filename,int hcin)
   
   clearins(0);   // initialise BT packet input stack 
    
-  if(inithci() == 0)
+  if(inithci(gpar.devid) == 0)
     return(0);
      
   errcount = 0;
@@ -2814,7 +2813,7 @@ int lescanx()
   struct devdata *dp;
   static char *fixran[2] = {"Fixed","Random"};
   static unsigned char advert[8] = { 0,0,0xC0,0xDE,0x99 };
-  char *buf;
+  char *buf,rssi[20];
   //static double powa[5] = { 1,10,100,1000,10000 };
   //static double powb[10] = { 1,1.25,1.6,2.0,2.5,3.16,4,5,6.3,8.0 };
   
@@ -2840,6 +2839,7 @@ int lescanx()
   for(n = 0 ; devok(n) != 0 ; ++n)
     dev[n]->foundflag = 0;   
 
+  rssi[0] = 0;
   buf = (char*)gpar.buf;  
   count= 0;
   newcount = 0;
@@ -2972,6 +2972,21 @@ int lescanx()
           j += rp[j] + 1;  // next entry   
           }
 
+      if(rp[j] > 0x7F)
+        {
+        i = rp[j]-256;
+        if(i > -60)
+          sprintf(rssi,"%d dBm strong",i);
+        else if(i > -80)
+          sprintf(rssi,"%d dBm medium",i);
+        else
+          sprintf(rssi,"%d dBm weak",i);
+        } 
+      else
+        {
+        rp[j] = 0;
+        rssi[0] = 0;
+        }
       /******
       if(rp[j] > 0x7F)
         {  // estimate distance from rssi
@@ -3034,7 +3049,7 @@ int lescanx()
                   
         if(ndevice >= 0)
           {
-          NPRINT "    Node=%d   Known device %s\n",dev[ndevice]->node,dev[ndevice]->name);
+          NPRINT "    Node=%d   Known device %s  %s\n",dev[ndevice]->node,dev[ndevice]->name,rssi);
           if((dev[ndevice]->leaddtype & 1) != (rp[1] & 1))
             {
             NPRINT "    Changing fixed/random address type\n");
@@ -3091,13 +3106,14 @@ int lescanx()
           
           strcpy(dev[ndevice]->name,buf);
                       
-          NPRINT "    Node=%d   New device %s\n",dev[ndevice]->node,dev[ndevice]->name);
+          NPRINT "    Node=%d   New device %s  %s\n",dev[ndevice]->node,dev[ndevice]->name,rssi);
           }
         if(ndevice >= 0)
           {
           dev[ndevice]->foundflag = 1;
-          for(k = 0 ; k <= rp[8] && k < 64 ; ++k)
-            dev[ndevice]->advert[k] = rp[8+k];
+          for(k = 0 ; k <= rp[8]+1 && k < 64 ; ++k)
+            dev[ndevice]->advert[k] = rp[8+k];  
+          ++dev[ndevice]->advert[0];  
           if(dev[ndevice]->advert[0] > 63)
             dev[ndevice]->advert[0] = 63;
           }  
@@ -4080,7 +4096,7 @@ int node_server(int clientnode,int (*callback)(int clientnode,unsigned char *buf
 int universal_server(int(*callback)(int,int,int,unsigned char*,int),char endchar,int keyflag,int timerds)
   {
   int n,dn,nread,key,ndevice,retval,loopt;
-  int node,op,cticn;
+  int node,op,cticn,oldkm;
   unsigned char readret;
   unsigned long long tim0,timms;
   struct devdata *dp;
@@ -4128,6 +4144,7 @@ int universal_server(int(*callback)(int,int,int,unsigned char*,int),char endchar
     loopt = 10;
     timms *= 100;
     }
+  oldkm = setkeymode(1);
   serverexit(1);
   do
     {
@@ -4172,7 +4189,18 @@ int universal_server(int(*callback)(int,int,int,unsigned char*,int),char endchar
         mesh_on();
         popins();
         if((dp->conflag & CON_RF) != 0)
+          {
           NPRINT "%s has connected\n",dp->name);
+          
+#ifdef BTFPYTHON
+          if(pycallback != NULL)
+            retval = py_us_callback(pycallback,dp->node,CLASSIC_CONNECT,0,buf,0);
+#else      
+          if(callback != NULL)
+            retval = (*callback)(dp->node,CLASSIC_CONNECT,0,buf,0);
+#endif
+          }
+
         flushprint();          
         }
         
@@ -4262,8 +4290,8 @@ int universal_server(int(*callback)(int,int,int,unsigned char*,int),char endchar
     }
   while((retval & SERVER_CONTINUE) != 0 && key != 'x');
   serverexit(0);
+  setkeymode(oldkm);
   gpar.serveractive = 0;    
-
     
   if(key == 'x')
     NPRINT "Key press - stopping server\n");
@@ -6399,33 +6427,6 @@ int sendhci(unsigned char *s,int ndevice)
  
   n = sendpack(cmd,len);
   gpar.lastsend = time_ms();
-  
-  /*********
-  ntogo = len;  // first header entry is length of cmd
-  timstart = timems();  
-   
-  do
-    {
-    nwrit = write(gpar.hci,cmd,ntogo);
-
-    if(nwrit > 0)
-      {
-      ntogo -= nwrit;
-      cmd += nwrit;
-      }
-    else
-      usleep(500);
-        
-    if(ntogo != 0 && timems() - timstart > (unsigned long long)5000)   // 5 sec timeout
-      {
-      NPRINT "Send CMD timeout - may need to reboot\n");
-      return(0);
-      }
-    }
-  while(ntogo != 0);
-  gpar.lastsend = timems();
-  *********/
-      
   gpar.cmdcount += cmdflag;
   
   return(n);
@@ -7170,7 +7171,7 @@ int readhci(int ndevice,long long int mustflag,long long int lookflag,int timout
         {
         dp = dev[devicen];   
             
-        if(dp->conflag != 0 && !((dp->conflag & CON_RF) == 0 && (dp->conflag & CON_SERVER) != 0))    
+        if(dp->conflag != 0) // && !((dp->conflag & CON_RF) == 0 && (dp->conflag & CON_SERVER) != 0))    
           NPRINT "%s has disconnected\n",dev[devicen]->name);
         if((gpar.hidflag & 1) == 0 && (dp->conflag & CON_MESH) != 0)
           mesh_on();
@@ -14789,7 +14790,7 @@ int checkfilename(char *t,char *s)
   return(1);
   }
 
-int inithci()
+int inithci(int devid)
   {
 #ifdef PICOSTACK
   hcisock();
@@ -14811,7 +14812,7 @@ int inithci()
     bluezdown();
     if(hcisock() == 0)
       {
-      NPRINT "No root permission or Bluetooth (hci%d) is off or crashed\n",gpar.devid); 
+      NPRINT "No root permission or Bluetooth (hci%d) is off or crashed\n",devid); 
       NPRINT "Must run with root permission via sudo as follows:\n"); 
       NPRINT "  sudo ./btferret (for C) or  sudo python3 btferret.py\n");
       flushprint();

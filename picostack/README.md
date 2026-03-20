@@ -1,7 +1,7 @@
 Pico Bluetooth Stack
 ==========================
 
-*Version 24*
+*Version 25*
 
 ## Contents
 - [1 Introduction](#1-introduction)
@@ -305,8 +305,19 @@ options are as follows:
 
 ### 3-5 FLASH usage
 
-Picostack uses a part of flash memory to store pairing data.
+Picostack uses a part of flash memory to store pairing data. The location used in
+flash memory can be changed to avoid a clash with other usage, or the use of
+flash memory can be stopped entirely. If flash is not used, reconnection of
+paired devices will not work, so do not use pairing/security, or make a new
+pairing on each connection. If you do not need pairing (e.g. an LE device with
+no security), you might as well stop flash usage to save resources.
 
+```
+To stop use of flash memory, uncomment NOFLASH near the top of picostack.c
+
+#define NOFLASH
+```
+To move the location:
 
 ```
 A flash sector is 4k
