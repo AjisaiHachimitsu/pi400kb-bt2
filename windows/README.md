@@ -525,13 +525,17 @@ DOWNLOAD from the github windows folder
   devices.txt
 ```
 
-The Python btfpy library module must be built first.
+The Python btfpy library module must be built first with setuptools.
 
 ```
-RUN from the command line
+INSTALL setuptools:
+
+  pip install setuptools[core]
+
+RUN btfwinpymake.py from the command line
 (NOTE do not use the developer command prompt that was needed for C)
 
-python btfwinpymake.py build
+  python btfwinpymake.py build
 
 This should compile the module. It will create a subdirectory called build
 containing a subdirectory called somthing like lib.win-amd64-cpython-312.
