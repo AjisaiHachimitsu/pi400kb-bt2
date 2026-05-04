@@ -52,6 +52,163 @@ more infomation.
 #include <stdlib.h>
 #include "btlib.h"   
 
+// #include "./pi400kb/pi400.h"
+
+// #include "gadget-hid.h"
+
+#include <sys/ioctl.h>
+#include <linux/hidraw.h>
+#include <linux/input.h>
+#include <signal.h>
+#include <errno.h>
+// #include <stdio.h>
+#include <fcntl.h>
+// #include <stdio.h>
+#include <poll.h>
+#include <unistd.h>
+#include <string.h>
+// #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+
+#define EVIOC_GRAB 1
+#define EVIOC_UNGRAB 0
+
+int hid_output;
+volatile int running = 0;
+volatile int grabbed = 0;
+
+int ret;
+int keyboard_fd;
+int mouse_fd;
+int uinput_keyboard_fd;
+int uinput_mouse_fd;
+struct hid_buf keyboard_buf;
+struct hid_buf mouse_buf;
+
+void signal_handler(int dummy) {
+    running = 0;
+}
+
+bool modprobe_libcomposite() {
+    pid_t pid;
+
+    pid = fork();
+
+    if (pid < 0) return false;
+    if (pid == 0) {
+        char* const argv[] = {"modprobe", "libcomposite", NULL};
+        execv("/usr/sbin/modprobe", argv);
+        exit(0);
+    }
+    waitpid(pid, NULL, 0);
+}
+
+bool trigger_hook() {
+    char buf[4096];
+    snprintf(buf, sizeof(buf), "%s %u", HOOK_PATH, grabbed ? 1u : 0u);
+    system(buf);
+}
+
+int find_hidraw_device(char *device_type, int16_t vid, int16_t pid) {
+    int fd;
+    int ret;
+    struct hidraw_devinfo hidinfo;
+    char path[20];
+
+    for(int x = 0; x < 16; x++){
+        sprintf(path, "/dev/hidraw%d", x);
+
+        if ((fd = open(path, O_RDWR | O_NONBLOCK)) == -1) {
+            continue;
+        }
+
+        ret = ioctl(fd, HIDIOCGRAWINFO, &hidinfo);
+
+        if(hidinfo.vendor == vid && hidinfo.product == pid) {
+            printf("Found %s at: %s\n", device_type, path);
+            return fd;
+        }
+
+        close(fd);
+    }
+
+    return -1;
+}
+
+int grab(char *dev) {
+    printf("Grabbing: %s\n", dev);
+    int fd = open(dev, O_RDONLY);
+    ioctl(fd, EVIOCGRAB, EVIOC_UNGRAB);
+    usleep(500000);
+    ioctl(fd, EVIOCGRAB, EVIOC_GRAB);
+    return fd;
+}
+
+void ungrab(int fd) {
+    ioctl(fd, EVIOCGRAB, EVIOC_UNGRAB);
+    close(fd);
+}
+
+void printhex(unsigned char *buf, size_t len) {
+    for(int x = 0; x < len; x++)
+    {
+        printf("%x ", buf[x]);
+    }
+    printf("\n");
+}
+
+void ungrab_both() {
+    printf("Releasing Keyboard and/or Mouse\n");
+
+    if(uinput_keyboard_fd > -1) {
+        ungrab(uinput_keyboard_fd);
+    }
+
+    if(uinput_mouse_fd > -1) {
+        ungrab(uinput_mouse_fd);
+    }
+
+    grabbed = 0;
+
+    trigger_hook();
+}
+
+void grab_both() {
+    printf("Grabbing Keyboard and/or Mouse\n");
+
+    if(keyboard_fd > -1) {
+        uinput_keyboard_fd = grab(KEYBOARD_DEV);
+    }
+
+    if(mouse_fd > -1) {
+        uinput_mouse_fd = grab(MOUSE_DEV);
+    }
+
+    if (uinput_keyboard_fd > -1 || uinput_mouse_fd > -1) {
+        grabbed = 1;
+    }
+
+    trigger_hook();
+}
+
+void send_empty_hid_reports_both() {
+    if(keyboard_fd > -1) {
+#ifndef NO_OUTPUT
+        memset(keyboard_buf.data, 0, KEYBOARD_HID_REPORT_SIZE);
+        write(hid_output, (unsigned char *)&keyboard_buf, KEYBOARD_HID_REPORT_SIZE + 1);
+#endif
+    }
+
+    if(mouse_fd > -1) {
+#ifndef NO_OUTPUT
+        memset(mouse_buf.data, 0, MOUSE_HID_REPORT_SIZE);
+        write(hid_output, (unsigned char *)&mouse_buf, MOUSE_HID_REPORT_SIZE + 1);
+#endif
+    }
+}
+
 int lecallback(int clientnode,int op,int cticn);
 int send_key(int key);
 
@@ -125,8 +282,42 @@ unsigned char protocolmode[1] = {0x01};
 unsigned char hidinfo[4] = {0x01,0x11,0x00,0x02};
 unsigned char battery[1] = {100}; 
 
+int find_hidraw_device(char *device_type, int16_t vid, int16_t pid) {
+    int fd;
+    int ret;
+    struct hidraw_devinfo hidinfo;
+    char path[20];
+
+    for(int x = 0; x < 16; x++){
+        sprintf(path, "/dev/hidraw%d", x);
+
+        if ((fd = open(path, O_RDWR | O_NONBLOCK)) == -1) {
+            continue;
+        }
+
+        ret = ioctl(fd, HIDIOCGRAWINFO, &hidinfo);
+
+        if(hidinfo.vendor == vid && hidinfo.product == pid) {
+            printf("Found %s at: %s\n", device_type, path);
+            return fd;
+        }
+
+        close(fd);
+    }
+
+    return -1;
+}
+
 int main()
   {
+        keyboard_buf.report_id = 1;
+    mouse_buf.report_id = 2;
+
+    keyboard_fd = find_hidraw_device("keyboard", KEYBOARD_VID, KEYBOARD_PID);
+    if(keyboard_fd == -1) {
+        printf("Failed to open keyboard device\n");
+    }
+    
   unsigned char uuid[2],randadd[6];
    
   if(init_blue("keyboard.txt") == 0)
