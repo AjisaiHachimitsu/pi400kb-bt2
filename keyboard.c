@@ -4,14 +4,14 @@ Download from https://github.com/petzval/btferret
   keyboard.txt
   btlib.c    Version 20 or later
   btlib.h    Version 20 or later
- 
+
 Edit keyboard.txt to set ADDRESS=
 to the address of the local device
 that runs this code
 
 Compile
   gcc keyboard.c btlib.c -o keyboard
-  
+
 Run
   sudo ./keyboard
 
@@ -19,7 +19,7 @@ Connect from phone/tablet/PC to "HID" device
 
 All keystrokes go to connecting device
 F10 sends "Hello" plus Enter
-ESC stops the server 
+ESC stops the server
 
 To add a battery level service:
 uncomment all battery level labelled
@@ -43,34 +43,33 @@ in the HID Devices section of the documentation.
 This code sets an unchanging random address.
 If connection is unreliable try changing the address.
 
-See HID Devices section in documentation for 
+See HID Devices section in documentation for
 more infomation.
 
-*********************************/    
+*********************************/
 
+#include "btlib.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "btlib.h"   
 
 // #include "./pi400kb/pi400.h"
 
 // #include "gadget-hid.h"
 
-#include <sys/ioctl.h>
+#include <errno.h>
 #include <linux/hidraw.h>
 #include <linux/input.h>
 #include <signal.h>
-#include <errno.h>
+#include <sys/ioctl.h>
 // #include <stdio.h>
 #include <fcntl.h>
 // #include <stdio.h>
 #include <poll.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
 // #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-
 
 #define EVIOC_GRAB 1
 #define EVIOC_UNGRAB 0
@@ -87,145 +86,144 @@ int uinput_mouse_fd;
 struct hid_buf keyboard_buf;
 struct hid_buf mouse_buf;
 
-void signal_handler(int dummy) {
-    running = 0;
-}
+void signal_handler(int dummy) { running = 0; }
 
 bool modprobe_libcomposite() {
-    pid_t pid;
+  pid_t pid;
 
-    pid = fork();
+  pid = fork();
 
-    if (pid < 0) return false;
-    if (pid == 0) {
-        char* const argv[] = {"modprobe", "libcomposite", NULL};
-        execv("/usr/sbin/modprobe", argv);
-        exit(0);
-    }
-    waitpid(pid, NULL, 0);
+  if (pid < 0)
+    return false;
+  if (pid == 0) {
+    char *const argv[] = {"modprobe", "libcomposite", NULL};
+    execv("/usr/sbin/modprobe", argv);
+    exit(0);
+  }
+  waitpid(pid, NULL, 0);
 }
 
 bool trigger_hook() {
-    char buf[4096];
-    snprintf(buf, sizeof(buf), "%s %u", HOOK_PATH, grabbed ? 1u : 0u);
-    system(buf);
+  char buf[4096];
+  snprintf(buf, sizeof(buf), "%s %u", HOOK_PATH, grabbed ? 1u : 0u);
+  system(buf);
 }
 
 int find_hidraw_device(char *device_type, int16_t vid, int16_t pid) {
-    int fd;
-    int ret;
-    struct hidraw_devinfo hidinfo;
-    char path[20];
+  int fd;
+  int ret;
+  struct hidraw_devinfo hidinfo;
+  char path[20];
 
-    for(int x = 0; x < 16; x++){
-        sprintf(path, "/dev/hidraw%d", x);
+  for (int x = 0; x < 16; x++) {
+    sprintf(path, "/dev/hidraw%d", x);
 
-        if ((fd = open(path, O_RDWR | O_NONBLOCK)) == -1) {
-            continue;
-        }
-
-        ret = ioctl(fd, HIDIOCGRAWINFO, &hidinfo);
-
-        if(hidinfo.vendor == vid && hidinfo.product == pid) {
-            printf("Found %s at: %s\n", device_type, path);
-            return fd;
-        }
-
-        close(fd);
+    if ((fd = open(path, O_RDWR | O_NONBLOCK)) == -1) {
+      continue;
     }
 
-    return -1;
+    ret = ioctl(fd, HIDIOCGRAWINFO, &hidinfo);
+
+    if (hidinfo.vendor == vid && hidinfo.product == pid) {
+      printf("Found %s at: %s\n", device_type, path);
+      return fd;
+    }
+
+    close(fd);
+  }
+
+  return -1;
 }
 
 int grab(char *dev) {
-    printf("Grabbing: %s\n", dev);
-    int fd = open(dev, O_RDONLY);
-    ioctl(fd, EVIOCGRAB, EVIOC_UNGRAB);
-    usleep(500000);
-    ioctl(fd, EVIOCGRAB, EVIOC_GRAB);
-    return fd;
+  printf("Grabbing: %s\n", dev);
+  int fd = open(dev, O_RDONLY);
+  ioctl(fd, EVIOCGRAB, EVIOC_UNGRAB);
+  usleep(500000);
+  ioctl(fd, EVIOCGRAB, EVIOC_GRAB);
+  return fd;
 }
 
 void ungrab(int fd) {
-    ioctl(fd, EVIOCGRAB, EVIOC_UNGRAB);
-    close(fd);
+  ioctl(fd, EVIOCGRAB, EVIOC_UNGRAB);
+  close(fd);
 }
 
 void printhex(unsigned char *buf, size_t len) {
-    for(int x = 0; x < len; x++)
-    {
-        printf("%x ", buf[x]);
-    }
-    printf("\n");
+  for (int x = 0; x < len; x++) {
+    printf("%x ", buf[x]);
+  }
+  printf("\n");
 }
 
 void ungrab_both() {
-    printf("Releasing Keyboard and/or Mouse\n");
+  printf("Releasing Keyboard and/or Mouse\n");
 
-    if(uinput_keyboard_fd > -1) {
-        ungrab(uinput_keyboard_fd);
-    }
+  if (uinput_keyboard_fd > -1) {
+    ungrab(uinput_keyboard_fd);
+  }
 
-    if(uinput_mouse_fd > -1) {
-        ungrab(uinput_mouse_fd);
-    }
+  if (uinput_mouse_fd > -1) {
+    ungrab(uinput_mouse_fd);
+  }
 
-    grabbed = 0;
+  grabbed = 0;
 
-    trigger_hook();
+  trigger_hook();
 }
 
 void grab_both() {
-    printf("Grabbing Keyboard and/or Mouse\n");
+  printf("Grabbing Keyboard and/or Mouse\n");
 
-    if(keyboard_fd > -1) {
-        uinput_keyboard_fd = grab(KEYBOARD_DEV);
-    }
+  if (keyboard_fd > -1) {
+    uinput_keyboard_fd = grab(KEYBOARD_DEV);
+  }
 
-    if(mouse_fd > -1) {
-        uinput_mouse_fd = grab(MOUSE_DEV);
-    }
+  if (mouse_fd > -1) {
+    uinput_mouse_fd = grab(MOUSE_DEV);
+  }
 
-    if (uinput_keyboard_fd > -1 || uinput_mouse_fd > -1) {
-        grabbed = 1;
-    }
+  if (uinput_keyboard_fd > -1 || uinput_mouse_fd > -1) {
+    grabbed = 1;
+  }
 
-    trigger_hook();
+  trigger_hook();
 }
 
 void send_empty_hid_reports_both() {
-    if(keyboard_fd > -1) {
+  if (keyboard_fd > -1) {
 #ifndef NO_OUTPUT
-        memset(keyboard_buf.data, 0, KEYBOARD_HID_REPORT_SIZE);
-        write(hid_output, (unsigned char *)&keyboard_buf, KEYBOARD_HID_REPORT_SIZE + 1);
+    memset(keyboard_buf.data, 0, KEYBOARD_HID_REPORT_SIZE);
+    write(hid_output, (unsigned char *)&keyboard_buf,
+          KEYBOARD_HID_REPORT_SIZE + 1);
 #endif
-    }
+  }
 
-    if(mouse_fd > -1) {
+  if (mouse_fd > -1) {
 #ifndef NO_OUTPUT
-        memset(mouse_buf.data, 0, MOUSE_HID_REPORT_SIZE);
-        write(hid_output, (unsigned char *)&mouse_buf, MOUSE_HID_REPORT_SIZE + 1);
+    memset(mouse_buf.data, 0, MOUSE_HID_REPORT_SIZE);
+    write(hid_output, (unsigned char *)&mouse_buf, MOUSE_HID_REPORT_SIZE + 1);
 #endif
-    }
+  }
 }
 
-int lecallback(int clientnode,int op,int cticn);
+int lecallback(int clientnode, int op, int cticn);
 int send_key(int key);
 
 /*********  keyboard.txt DEVICES file ******
 DEVICE = My Pi   TYPE=Mesh  node=1  ADDRESS = DC:A6:32:04:DB:56
   PRIMARY_SERVICE = 1800
-    LECHAR=Device Name   SIZE=4   Permit=02 UUID=2A00  
-    LECHAR=Appearance    SIZE=2   Permit=02 UUID=2A01  
+    LECHAR=Device Name   SIZE=4   Permit=02 UUID=2A00
+    LECHAR=Appearance    SIZE=2   Permit=02 UUID=2A01
   PRIMARY_SERVICE = 180A
-    LECHAR= PnP ID       SIZE=7 Permit=02 UUID=2A50  
+    LECHAR= PnP ID       SIZE=7 Permit=02 UUID=2A50
   PRIMARY_SERVICE = 1812
-    LECHAR=Protocol Mode   SIZE=1  Permit=06  UUID=2A4E  
-    LECHAR=HID Info        SIZE=4  Permit=02  UUID=2A4A  
-    LECHAR=HID Ctl Point   SIZE=8  Permit=04  UUID=2A4C  
-    LECHAR=Report Map      SIZE=47 Permit=02  UUID=2A4B  
-    LECHAR=Report1         SIZE=8  Permit=92  UUID=2A4D  
-        ; Report1 must have Report ID = 1 
+    LECHAR=Protocol Mode   SIZE=1  Permit=06  UUID=2A4E
+    LECHAR=HID Info        SIZE=4  Permit=02  UUID=2A4A
+    LECHAR=HID Ctl Point   SIZE=8  Permit=04  UUID=2A4C
+    LECHAR=Report Map      SIZE=47 Permit=02  UUID=2A4B
+    LECHAR=Report1         SIZE=8  Permit=92  UUID=2A4D
+        ; Report1 must have Report ID = 1
         ;   0x85, 0x01 in Report Map
         ; unsigned char uuid[2]={0x2A,0x4D};
         ; index = find_ctic_index(localnode(),UUID_2,uuid);
@@ -233,10 +231,9 @@ DEVICE = My Pi   TYPE=Mesh  node=1  ADDRESS = DC:A6:32:04:DB:56
 
 ;  *** Optional battery level ***
 ;  PRIMARY_SERVICE = 180F
-;    LECHAR=Battery Level   SIZE=1 Permit=12  UUID=2A19   
+;    LECHAR=Battery Level   SIZE=1 Permit=12  UUID=2A19
 
 ********/
-
 
 /**** KEYBOARD REPORT MAP *****
 0x05, 0x01 Usage Page (Generic Desktop)
@@ -248,7 +245,7 @@ DEVICE = My Pi   TYPE=Mesh  node=1  ADDRESS = DC:A6:32:04:DB:56
 0x29, 0xe7 Usage Maximum (Keyboard Right GUI)
 0x15, 0x00 Logical Minimum (0)
 0x25, 0x01 Logical Maximum (1)
-0x75, 0x01 Report Size (1)  
+0x75, 0x01 Report Size (1)
 0x95, 0x08 Report Count (8)
 0x81, 0x02 Input (Data, Variable, Absolute) Modifier byte
 0x95, 0x01 Report Count (1)
@@ -265,151 +262,156 @@ DEVICE = My Pi   TYPE=Mesh  node=1  ADDRESS = DC:A6:32:04:DB:56
 0xc0 End Collection
 *******************/
 
-    // NOTE the size of reportmap (47 in this case) must appear in keyboard.txt as follows:
-    //   LECHAR=Report Map      SIZE=47 Permit=02  UUID=2A4B  
-unsigned char reportmap[47] = {0x05,0x01,0x09,0x06,0xA1,0x01,0x85,0x01,0x05,0x07,0x19,0xE0,0x29,0xE7,0x15,0x00,
-                               0x25,0x01,0x75,0x01,0x95,0x08,0x81,0x02,0x95,0x01,0x75,0x08,0x81,0x01,0x95,0x06,
-                               0x75,0x08,0x15,0x00,0x25,0x65,0x05,0x07,0x19,0x00,0x29,0x65,0x81,0x00,0xC0};
+// NOTE the size of reportmap (47 in this case) must appear in keyboard.txt as
+// follows:
+//   LECHAR=Report Map      SIZE=47 Permit=02  UUID=2A4B
+unsigned char reportmap[47] = {
+    0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x85, 0x01, 0x05, 0x07, 0x19, 0xE0,
+    0x29, 0xE7, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x08, 0x81, 0x02,
+    0x95, 0x01, 0x75, 0x08, 0x81, 0x01, 0x95, 0x06, 0x75, 0x08, 0x15, 0x00,
+    0x25, 0x65, 0x05, 0x07, 0x19, 0x00, 0x29, 0x65, 0x81, 0x00, 0xC0};
 
-    // NOTE the size of report (8 in this case) must appear in keyboard.txt as follows:
-    //   LECHAR=Report1         SIZE=8  Permit=92  UUID=2A4D  
-unsigned char report[8] = {0,0,0,0,0,0,0,0};
+// NOTE the size of report (8 in this case) must appear in keyboard.txt as
+// follows:
+//   LECHAR=Report1         SIZE=8  Permit=92  UUID=2A4D
+unsigned char report[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-unsigned char *name = "HID"; 
-unsigned char appear[2] = {0xC1,0x03};  // 03C1 = keyboard icon appears on connecting device 
-unsigned char pnpinfo[7] = {0x02,0x6B,0x1D,0x46,0x02,0x37,0x05};
+unsigned char *name = "HID";
+unsigned char appear[2] = {
+    0xC1, 0x03}; // 03C1 = keyboard icon appears on connecting device
+unsigned char pnpinfo[7] = {0x02, 0x6B, 0x1D, 0x46, 0x02, 0x37, 0x05};
 unsigned char protocolmode[1] = {0x01};
-unsigned char hidinfo[4] = {0x01,0x11,0x00,0x02};
-unsigned char battery[1] = {100}; 
+unsigned char hidinfo[4] = {0x01, 0x11, 0x00, 0x02};
+unsigned char battery[1] = {100};
 
 int find_hidraw_device(char *device_type, int16_t vid, int16_t pid) {
-    int fd;
-    int ret;
-    struct hidraw_devinfo hidinfo;
-    char path[20];
+  int fd;
+  int ret;
+  struct hidraw_devinfo hidinfo;
+  char path[20];
 
-    for(int x = 0; x < 16; x++){
-        sprintf(path, "/dev/hidraw%d", x);
+  for (int x = 0; x < 16; x++) {
+    sprintf(path, "/dev/hidraw%d", x);
 
-        if ((fd = open(path, O_RDWR | O_NONBLOCK)) == -1) {
-            continue;
-        }
-
-        ret = ioctl(fd, HIDIOCGRAWINFO, &hidinfo);
-
-        if(hidinfo.vendor == vid && hidinfo.product == pid) {
-            printf("Found %s at: %s\n", device_type, path);
-            return fd;
-        }
-
-        close(fd);
+    if ((fd = open(path, O_RDWR | O_NONBLOCK)) == -1) {
+      continue;
     }
 
-    return -1;
+    ret = ioctl(fd, HIDIOCGRAWINFO, &hidinfo);
+
+    if (hidinfo.vendor == vid && hidinfo.product == pid) {
+      printf("Found %s at: %s\n", device_type, path);
+      return fd;
+    }
+
+    close(fd);
+  }
+
+  return -1;
 }
 
-int main()
-  {
-        keyboard_buf.report_id = 1;
-    mouse_buf.report_id = 2;
+int main() {
+  keyboard_buf.report_id = 1;
+  mouse_buf.report_id = 2;
 
-    keyboard_fd = find_hidraw_device("keyboard", KEYBOARD_VID, KEYBOARD_PID);
-    if(keyboard_fd == -1) {
-        printf("Failed to open keyboard device\n");
-    }
-    
-  unsigned char uuid[2],randadd[6];
-   
-  if(init_blue("keyboard.txt") == 0)
-    return(0);
-    
-  if(localnode() != 1)
-    {
-    printf("ERROR - Edit keyboard.txt to set ADDRESS = %s\n",device_address(localnode()));
-    return(0);
-    }
+  keyboard_fd = find_hidraw_device("keyboard", KEYBOARD_VID, KEYBOARD_PID);
+  if (keyboard_fd == -1) {
+    printf("Failed to open keyboard device\n");
+  }
+
+  unsigned char uuid[2], randadd[6];
+
+  if (init_blue("keyboard.txt") == 0)
+    return (0);
+
+  if (localnode() != 1) {
+    printf("ERROR - Edit keyboard.txt to set ADDRESS = %s\n",
+           device_address(localnode()));
+    return (0);
+  }
 
   // Write data to local characteristics
   uuid[0] = 0x2A;
   uuid[1] = 0x00;
-  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),name,3); 
+  write_ctic(localnode(), find_ctic_index(localnode(), UUID_2, uuid), name, 3);
 
   uuid[0] = 0x2A;
   uuid[1] = 0x01;
-  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),appear,0);
+  write_ctic(localnode(), find_ctic_index(localnode(), UUID_2, uuid), appear,
+             0);
 
   uuid[0] = 0x2A;
   uuid[1] = 0x4E;
-  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),protocolmode,0);
+  write_ctic(localnode(), find_ctic_index(localnode(), UUID_2, uuid),
+             protocolmode, 0);
 
   uuid[0] = 0x2A;
   uuid[1] = 0x4A;
-  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),hidinfo,0);
+  write_ctic(localnode(), find_ctic_index(localnode(), UUID_2, uuid), hidinfo,
+             0);
 
   uuid[0] = 0x2A;
   uuid[1] = 0x4B;
-  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),reportmap,0);
+  write_ctic(localnode(), find_ctic_index(localnode(), UUID_2, uuid), reportmap,
+             0);
 
   uuid[0] = 0x2A;
   uuid[1] = 0x4D;
-  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),report,0);
+  write_ctic(localnode(), find_ctic_index(localnode(), UUID_2, uuid), report,
+             0);
 
   uuid[0] = 0x2A;
   uuid[1] = 0x50;
-  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),pnpinfo,0);
-   
+  write_ctic(localnode(), find_ctic_index(localnode(), UUID_2, uuid), pnpinfo,
+             0);
+
   /**** battery level ******/
   //  uuid[0] = 0x2A;
   //  uuid[1] = 0x19;
-  //  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),battery,1); 
-  /************************/     
-                          
+  //  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),battery,1);
+  /************************/
+
   // Set unchanging random address by hard-coding a fixed value.
   // If connection produces an "Attempting Classic connection"
   // error then choose a different address.
   // If set_le_random_address() is not called, the system will set a
-  // new and different random address every time this code is run.  
- 
+  // new and different random address every time this code is run.
+
   // Choose the following 6 numbers
-  randadd[0] = 0xD3;  // 2 hi bits must be 1
+  randadd[0] = 0xD3; // 2 hi bits must be 1
   randadd[1] = 0x56;
   randadd[2] = 0xD6;
   randadd[3] = 0x74;
   randadd[4] = 0x33;
   randadd[5] = 0x04;
   set_le_random_address(randadd);
-     
-  keys_to_callback(KEY_ON,0);  // enable LE_KEYPRESS calls in lecallback
-                               // 0 = GB keyboard  
-  set_le_wait(20000);  // Allow 20 seconds for connection to complete
-                                         
-  le_pair(localnode(),JUST_WORKS,0);  // Easiest option, but if client requires
-                                      // passkey security - remove this command  
-  le_server(lecallback,0);
-  
+
+  keys_to_callback(KEY_ON, 0); // enable LE_KEYPRESS calls in lecallback
+                               // 0 = GB keyboard
+  set_le_wait(20000);          // Allow 20 seconds for connection to complete
+
+  le_pair(localnode(), JUST_WORKS, 0); // Easiest option, but if client requires
+                                       // passkey security - remove this command
+  le_server(lecallback, 0);
+
   close_all();
-  return(1);
-  }
+  return (1);
+}
 
-
-int lecallback(int clientnode,int op,int cticn)
-  {
+int lecallback(int clientnode, int op, int cticn) {
   int n;
-  static char hello[8] = { "Hello\n"};  // \n = Enter
-        
-  if(op == LE_CONNECT)
-    {
+  static char hello[8] = {"Hello\n"}; // \n = Enter
+
+  if (op == LE_CONNECT) {
     printf("Connected OK. Key presses sent to client. ESC stops server\n");
     printf("F10 sends Hello plus Enter\n");
-    }
-  if(op == LE_KEYPRESS)
-    {  // cticn = ASCII code of key OR btferret custom code
-    if(cticn == 23)
-      {    // 23 = btferret custom code for F10
-           // Send "Hello" plus Enter
-      for(n = 0 ; hello[n] != 0 ; ++n)
+  }
+  if (op == LE_KEYPRESS) { // cticn = ASCII code of key OR btferret custom code
+    if (cticn == 23) {     // 23 = btferret custom code for F10
+                           // Send "Hello" plus Enter
+      for (n = 0; hello[n] != 0; ++n)
         send_key(hello[n]);
-        
+
       /**** battery level ****/
       //  if(battery[0] > 0)
       //    --battery[0];
@@ -417,15 +419,13 @@ int lecallback(int clientnode,int op,int cticn)
       //  uuid[1] = 0x19;
       //  write_ctic(localnode(),find_ctic_index(localnode(),UUID_2,uuid),battery,1);
       /*******************/
-      }
-    else  
-      send_key(cticn);      
- 
-    }
-  if(op == LE_DISCONNECT)
-    return(SERVER_EXIT);
-  return(SERVER_CONTINUE);
+    } else
+      send_key(cticn);
   }
+  if (op == LE_DISCONNECT)
+    return (SERVER_EXIT);
+  return (SERVER_CONTINUE);
+}
 
 /*********** SEND KEY *****************
 
@@ -440,19 +440,19 @@ key code = ASCII code of character (e.g a=97) OR one of the
 4 = Home     11 = Pound (^3) 20 = F7     28 = Right arrow
 5 = End      14 = F1         21 = F8     29 = Left arrow
 6 = PgUp     15 = F2         22 = F9     30 = Down arrow
-7 = PgDn     16 = F3         23 = F10    31 = Up arrow 
+7 = PgDn     16 = F3         23 = F10    31 = Up arrow
 
 ASCII codes                    'a' = 97               (valid range 32-126)
 CTRL add 128 (0x80)         CTRL a = 'a' + 128 = 225  (valid range 225-255)
 Left ALT add 256 (0x100)     ALT a = 'a' + 256 = 353  (valid range 257-382)
 Right ALT add 384 (0x180)  AltGr a = 'a' + 384 = 481  (valid range 481-516)
 
-SHIFT F1-F8 codes SHIFT F1 = 471  (valid range 471-478) 
+SHIFT F1-F8 codes SHIFT F1 = 471  (valid range 471-478)
 
-Note CTRL i = same as Tab  CTRL m = same as Enter  
+Note CTRL i = same as Tab  CTRL m = same as Enter
 Some ALT keys generate ASCII codes
 
-To send k: send_key('k')  
+To send k: send_key('k')
 To send F1: send_key(14)
 To send CTRL b:  send_key(226) same as send_key('b' | 0x80)
 To send AltGr t: send_key(500) same as send_key('t' | 0x180)
@@ -463,42 +463,39 @@ keys_to_callback() section in documentation
 Modifier bits, hex values:
 01=Left CTL  02=Left Shift  04=Left Alt  08=Left GUI
 10=Right CTL 20=Right Shift 40=Right Alt 80=Right GUI
- 
+
 **************************************/
 
-int send_key(int key)
-  {
-  int n,hidcode;
+int send_key(int key) {
+  int n, hidcode;
   unsigned char buf[8];
   static int reportindex = -1;
 
-  // convert btferret code (key) to HID code  
+  // convert btferret code (key) to HID code
   hidcode = hid_key_code(key);
-  if(hidcode == 0)
-    return(0);
+  if (hidcode == 0)
+    return (0);
 
-  if(reportindex < 0)
-    {  // look up Report1 index
+  if (reportindex < 0) { // look up Report1 index
     buf[0] = 0x2A;
     buf[1] = 0x4D;
-    reportindex = find_ctic_index(localnode(),UUID_2,buf);
-    if(reportindex < 0)
-      {
+    reportindex = find_ctic_index(localnode(), UUID_2, buf);
+    if (reportindex < 0) {
       printf("Failed to find Report characteristic\n");
-      return(0);
-      }
-    }     
- 
-  for(n = 0 ; n < 8 ; ++n)
+      return (0);
+    }
+  }
+
+  for (n = 0; n < 8; ++n)
     buf[n] = 0;
-        
+
   // send key press to Report1
-  buf[0] = (hidcode >> 8) & 0xFF;  // modifier
-  buf[2] = hidcode & 0xFF;         // key code
-  write_ctic(localnode(),reportindex,buf,0);
+  buf[0] = (hidcode >> 8) & 0xFF; // modifier
+  buf[2] = hidcode & 0xFF;        // key code
+  write_ctic(localnode(), reportindex, buf, 0);
   // send no key pressed - all zero
   buf[0] = 0;
   buf[2] = 0;
-  write_ctic(localnode(),reportindex,buf,0); 
-  return(1);
-  }
+  write_ctic(localnode(), reportindex, buf, 0);
+  return (1);
+}
