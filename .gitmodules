@@ -1,0 +1,3 @@
+[submodule "pi400kb"]
+	path = pi400kb
+	url = https://github.com/Gadgetoid/pi400kb.git
