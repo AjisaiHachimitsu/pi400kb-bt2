@@ -74,6 +74,110 @@ more infomation.
 #define EVIOC_GRAB 1
 #define EVIOC_UNGRAB 0
 
+
+int lecallback(int clientnode, int op, int cticn);
+int send_key(int key);
+
+/*********  keyboard.txt DEVICES file ******
+DEVICE = My Pi   TYPE=Mesh  node=1  ADDRESS = DC:A6:32:04:DB:56
+  PRIMARY_SERVICE = 1800
+    LECHAR=Device Name   SIZE=4   Permit=02 UUID=2A00
+    LECHAR=Appearance    SIZE=2   Permit=02 UUID=2A01
+  PRIMARY_SERVICE = 180A
+    LECHAR= PnP ID       SIZE=7 Permit=02 UUID=2A50
+  PRIMARY_SERVICE = 1812
+    LECHAR=Protocol Mode   SIZE=1  Permit=06  UUID=2A4E
+    LECHAR=HID Info        SIZE=4  Permit=02  UUID=2A4A
+    LECHAR=HID Ctl Point   SIZE=8  Permit=04  UUID=2A4C
+    LECHAR=Report Map      SIZE=47 Permit=02  UUID=2A4B
+    LECHAR=Report1         SIZE=8  Permit=92  UUID=2A4D
+        ; Report1 must have Report ID = 1
+        ;   0x85, 0x01 in Report Map
+        ; unsigned char uuid[2]={0x2A,0x4D};
+        ; index = find_ctic_index(localnode(),UUID_2,uuid);
+        ; Send data: write_ctic(localnode(),index,data,0);
+
+;  *** Optional battery level ***
+;  PRIMARY_SERVICE = 180F
+;    LECHAR=Battery Level   SIZE=1 Permit=12  UUID=2A19
+
+********/
+
+/**** KEYBOARD REPORT MAP *****
+0x05, 0x01 Usage Page (Generic Desktop)
+0x09, 0x06 Usage (Keyboard)
+0xa1, 0x01 Collection (Application)
+0x85, 0x01 Report ID = 1
+0x05, 0x07 Usage Page (Keyboard)
+0x19, 0xe0 Usage Minimum (Keyboard LeftControl)
+0x29, 0xe7 Usage Maximum (Keyboard Right GUI)
+0x15, 0x00 Logical Minimum (0)
+0x25, 0x01 Logical Maximum (1)
+0x75, 0x01 Report Size (1)
+0x95, 0x08 Report Count (8)
+0x81, 0x02 Input (Data, Variable, Absolute) Modifier byte
+0x95, 0x01 Report Count (1)
+0x75, 0x08 Report Size (8)
+0x81, 0x01 Input (Constant) Reserved byte
+0x95, 0x06 Report Count (6)
+0x75, 0x08 Report Size (8)
+0x15, 0x00 Logical Minimum (0)
+0x25, 0x65 Logical Maximum (101)
+0x05, 0x07 Usage Page (Key Codes)
+0x19, 0x00 Usage Minimum (Reserved (no event indicated))
+0x29, 0x65 Usage Maximum (Keyboard Application)
+0x81, 0x00 Input (Data,Array) Key arrays (6 bytes)
+0xc0 End Collection
+*******************/
+
+// NOTE the size of reportmap (47 in this case) must appear in keyboard.txt as
+// follows:
+//   LECHAR=Report Map      SIZE=47 Permit=02  UUID=2A4B
+unsigned char reportmap[47] = {
+    0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x85, 0x01, 0x05, 0x07, 0x19, 0xE0,
+    0x29, 0xE7, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x08, 0x81, 0x02,
+    0x95, 0x01, 0x75, 0x08, 0x81, 0x01, 0x95, 0x06, 0x75, 0x08, 0x15, 0x00,
+    0x25, 0x65, 0x05, 0x07, 0x19, 0x00, 0x29, 0x65, 0x81, 0x00, 0xC0};
+
+// NOTE the size of report (8 in this case) must appear in keyboard.txt as
+// follows:
+//   LECHAR=Report1         SIZE=8  Permit=92  UUID=2A4D
+unsigned char report[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+unsigned char *name = "HID";
+unsigned char appear[2] = {
+    0xC1, 0x03}; // 03C1 = keyboard icon appears on connecting device
+unsigned char pnpinfo[7] = {0x02, 0x6B, 0x1D, 0x46, 0x02, 0x37, 0x05};
+unsigned char protocolmode[1] = {0x01};
+unsigned char hidinfo[4] = {0x01, 0x11, 0x00, 0x02};
+unsigned char battery[1] = {100};
+
+int find_hidraw_device(char *device_type, int16_t vid, int16_t pid) {
+  int fd;
+  int ret;
+  struct hidraw_devinfo hidinfo;
+  char path[20];
+
+  for (int x = 0; x < 16; x++) {
+    sprintf(path, "/dev/hidraw%d", x);
+
+    if ((fd = open(path, O_RDWR | O_NONBLOCK)) == -1) {
+      continue;
+    }
+
+    ret = ioctl(fd, HIDIOCGRAWINFO, &hidinfo);
+
+    if (hidinfo.vendor == vid && hidinfo.product == pid) {
+      printf("Found %s at: %s\n", device_type, path);
+      return fd;
+    }
+
+    close(fd);
+  }
+
+  return -1;
+}
+
 int hid_output;
 volatile int running = 0;
 volatile int grabbed = 0;
@@ -205,109 +309,6 @@ void send_empty_hid_reports_both() {
     write(hid_output, (unsigned char *)&mouse_buf, MOUSE_HID_REPORT_SIZE + 1);
 #endif
   }
-}
-
-int lecallback(int clientnode, int op, int cticn);
-int send_key(int key);
-
-/*********  keyboard.txt DEVICES file ******
-DEVICE = My Pi   TYPE=Mesh  node=1  ADDRESS = DC:A6:32:04:DB:56
-  PRIMARY_SERVICE = 1800
-    LECHAR=Device Name   SIZE=4   Permit=02 UUID=2A00
-    LECHAR=Appearance    SIZE=2   Permit=02 UUID=2A01
-  PRIMARY_SERVICE = 180A
-    LECHAR= PnP ID       SIZE=7 Permit=02 UUID=2A50
-  PRIMARY_SERVICE = 1812
-    LECHAR=Protocol Mode   SIZE=1  Permit=06  UUID=2A4E
-    LECHAR=HID Info        SIZE=4  Permit=02  UUID=2A4A
-    LECHAR=HID Ctl Point   SIZE=8  Permit=04  UUID=2A4C
-    LECHAR=Report Map      SIZE=47 Permit=02  UUID=2A4B
-    LECHAR=Report1         SIZE=8  Permit=92  UUID=2A4D
-        ; Report1 must have Report ID = 1
-        ;   0x85, 0x01 in Report Map
-        ; unsigned char uuid[2]={0x2A,0x4D};
-        ; index = find_ctic_index(localnode(),UUID_2,uuid);
-        ; Send data: write_ctic(localnode(),index,data,0);
-
-;  *** Optional battery level ***
-;  PRIMARY_SERVICE = 180F
-;    LECHAR=Battery Level   SIZE=1 Permit=12  UUID=2A19
-
-********/
-
-/**** KEYBOARD REPORT MAP *****
-0x05, 0x01 Usage Page (Generic Desktop)
-0x09, 0x06 Usage (Keyboard)
-0xa1, 0x01 Collection (Application)
-0x85, 0x01 Report ID = 1
-0x05, 0x07 Usage Page (Keyboard)
-0x19, 0xe0 Usage Minimum (Keyboard LeftControl)
-0x29, 0xe7 Usage Maximum (Keyboard Right GUI)
-0x15, 0x00 Logical Minimum (0)
-0x25, 0x01 Logical Maximum (1)
-0x75, 0x01 Report Size (1)
-0x95, 0x08 Report Count (8)
-0x81, 0x02 Input (Data, Variable, Absolute) Modifier byte
-0x95, 0x01 Report Count (1)
-0x75, 0x08 Report Size (8)
-0x81, 0x01 Input (Constant) Reserved byte
-0x95, 0x06 Report Count (6)
-0x75, 0x08 Report Size (8)
-0x15, 0x00 Logical Minimum (0)
-0x25, 0x65 Logical Maximum (101)
-0x05, 0x07 Usage Page (Key Codes)
-0x19, 0x00 Usage Minimum (Reserved (no event indicated))
-0x29, 0x65 Usage Maximum (Keyboard Application)
-0x81, 0x00 Input (Data,Array) Key arrays (6 bytes)
-0xc0 End Collection
-*******************/
-
-// NOTE the size of reportmap (47 in this case) must appear in keyboard.txt as
-// follows:
-//   LECHAR=Report Map      SIZE=47 Permit=02  UUID=2A4B
-unsigned char reportmap[47] = {
-    0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x85, 0x01, 0x05, 0x07, 0x19, 0xE0,
-    0x29, 0xE7, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x08, 0x81, 0x02,
-    0x95, 0x01, 0x75, 0x08, 0x81, 0x01, 0x95, 0x06, 0x75, 0x08, 0x15, 0x00,
-    0x25, 0x65, 0x05, 0x07, 0x19, 0x00, 0x29, 0x65, 0x81, 0x00, 0xC0};
-
-// NOTE the size of report (8 in this case) must appear in keyboard.txt as
-// follows:
-//   LECHAR=Report1         SIZE=8  Permit=92  UUID=2A4D
-unsigned char report[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-
-unsigned char *name = "HID";
-unsigned char appear[2] = {
-    0xC1, 0x03}; // 03C1 = keyboard icon appears on connecting device
-unsigned char pnpinfo[7] = {0x02, 0x6B, 0x1D, 0x46, 0x02, 0x37, 0x05};
-unsigned char protocolmode[1] = {0x01};
-unsigned char hidinfo[4] = {0x01, 0x11, 0x00, 0x02};
-unsigned char battery[1] = {100};
-
-int find_hidraw_device(char *device_type, int16_t vid, int16_t pid) {
-  int fd;
-  int ret;
-  struct hidraw_devinfo hidinfo;
-  char path[20];
-
-  for (int x = 0; x < 16; x++) {
-    sprintf(path, "/dev/hidraw%d", x);
-
-    if ((fd = open(path, O_RDWR | O_NONBLOCK)) == -1) {
-      continue;
-    }
-
-    ret = ioctl(fd, HIDIOCGRAWINFO, &hidinfo);
-
-    if (hidinfo.vendor == vid && hidinfo.product == pid) {
-      printf("Found %s at: %s\n", device_type, path);
-      return fd;
-    }
-
-    close(fd);
-  }
-
-  return -1;
 }
 
 int main() {
